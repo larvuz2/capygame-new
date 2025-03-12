@@ -39,13 +39,18 @@ export class CharacterController {
 
     update(deltaTime, moveDirection, isJumping) {
         // Update position
-        if (moveDirection) {
-            this.capsule.position.add(moveDirection);
-            this.isMoving = moveDirection.length() > 0;
+        if (moveDirection && moveDirection instanceof THREE.Vector3) {
+            // Create a copy of the vector to avoid modifying the original
+            const movement = moveDirection.clone();
+            this.capsule.position.x += movement.x;
+            this.capsule.position.y += movement.y;
+            this.capsule.position.z += movement.z;
+            
+            this.isMoving = movement.length() > 0;
 
             // Rotate character to face movement direction
             if (this.isMoving) {
-                const angle = Math.atan2(moveDirection.x, moveDirection.z);
+                const angle = Math.atan2(movement.x, movement.z);
                 this.capsule.rotation.y = angle;
             }
         } else {
