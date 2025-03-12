@@ -1,0 +1,18 @@
+{
+  "name": "capygame",
+  "version": "1.0.0",
+  "description": "A 3D physics-based game with jumping mechanics",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.11.2",
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "vite": "^6.2.1"
+  }
+}
