@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CharacterModel } from './CharacterModel';
+import { VectorUtil } from '../utils/VectorUtil';
 
 export class CharacterController {
     constructor(scene) {
@@ -24,17 +25,14 @@ export class CharacterController {
         // Movement state
         this.isMoving = false;
         this.isJumping = false;
-        
-        // Create a vector to safely store movement
-        this.movementVector = new THREE.Vector3();
     }
 
     async initializeCharacterModel() {
         try {
             const model = await this.characterModel.load();
             if (model) {
-                // Set model position directly instead of using vector addition
-                model.position.set(0, 0.85, 0); // Adjust based on your model
+                // Set model position directly
+                model.position.set(0, 0.85, 0);
                 model.castShadow = true;
                 this.capsule.add(model);
             }
@@ -44,56 +42,39 @@ export class CharacterController {
     }
 
     update(deltaTime, moveDirection, isJumping) {
-        // Update position
-        if (moveDirection) {
-            try {
-                // Directly update position components
-                if (typeof moveDirection.x === 'number') {
-                    this.capsule.position.x += moveDirection.x;
-                }
-                if (typeof moveDirection.y === 'number') {
-                    this.capsule.position.y += moveDirection.y;
-                }
-                if (typeof moveDirection.z === 'number') {
-                    this.capsule.position.z += moveDirection.z;
-                }
-                
-                // Calculate if moving based on the values, not vector methods
-                const movingX = Math.abs(moveDirection.x || 0) > 0.001;
-                const movingZ = Math.abs(moveDirection.z || 0) > 0.001;
-                this.isMoving = movingX || movingZ;
+        try {
+            // Update position using safe vector utility
+            if (moveDirection) {
+                VectorUtil.applyMovement(this.capsule, moveDirection);
+                this.isMoving = VectorUtil.hasMovement(moveDirection);
 
                 // Rotate character to face movement direction
-                if (this.isMoving && typeof moveDirection.x === 'number' && typeof moveDirection.z === 'number') {
-                    const angle = Math.atan2(moveDirection.x, moveDirection.z);
-                    this.capsule.rotation.y = angle;
+                if (this.isMoving) {
+                    this.capsule.rotation.y = VectorUtil.getRotationAngle(moveDirection);
                 }
-            } catch (error) {
-                console.error('Error updating character position:', error);
+            } else {
                 this.isMoving = false;
             }
-        } else {
-            this.isMoving = false;
-        }
 
-        // Update jumping state
-        this.isJumping = !!isJumping; // Convert to boolean
+            // Update jumping state
+            this.isJumping = !!isJumping;
 
-        // Update animations
-        if (this.characterModel) {
-            if (this.isJumping) {
-                this.characterModel.playAnimation('jump');
-            } else if (this.isMoving) {
-                this.characterModel.playAnimation('walk');
-            } else {
-                this.characterModel.playAnimation('idle');
+            // Update animations
+            if (this.characterModel) {
+                if (this.isJumping) {
+                    this.characterModel.playAnimation('jump');
+                } else if (this.isMoving) {
+                    this.characterModel.playAnimation('walk');
+                } else {
+                    this.characterModel.playAnimation('idle');
+                }
+                
+                if (typeof deltaTime === 'number') {
+                    this.characterModel.update(deltaTime);
+                }
             }
-            
-            try {
-                this.characterModel.update(deltaTime);
-            } catch (error) {
-                console.error('Error updating character animations:', error);
-            }
+        } catch (error) {
+            console.error('Error in CharacterController update:', error);
         }
     }
 
