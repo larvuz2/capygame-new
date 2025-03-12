@@ -24,14 +24,20 @@ export class CharacterController {
         // Movement state
         this.isMoving = false;
         this.isJumping = false;
+        
+        // Create a vector to safely store movement
+        this.movementVector = new THREE.Vector3();
     }
 
     async initializeCharacterModel() {
         try {
             const model = await this.characterModel.load();
-            model.position.y = 0.85; // Adjust based on your model
-            model.castShadow = true;
-            this.capsule.add(model);
+            if (model) {
+                // Set model position directly instead of using vector addition
+                model.position.set(0, 0.85, 0); // Adjust based on your model
+                model.castShadow = true;
+                this.capsule.add(model);
+            }
         } catch (error) {
             console.error('Failed to load character model:', error);
         }
@@ -39,26 +45,39 @@ export class CharacterController {
 
     update(deltaTime, moveDirection, isJumping) {
         // Update position
-        if (moveDirection && moveDirection instanceof THREE.Vector3) {
-            // Create a copy of the vector to avoid modifying the original
-            const movement = moveDirection.clone();
-            this.capsule.position.x += movement.x;
-            this.capsule.position.y += movement.y;
-            this.capsule.position.z += movement.z;
-            
-            this.isMoving = movement.length() > 0;
+        if (moveDirection) {
+            try {
+                // Directly update position components
+                if (typeof moveDirection.x === 'number') {
+                    this.capsule.position.x += moveDirection.x;
+                }
+                if (typeof moveDirection.y === 'number') {
+                    this.capsule.position.y += moveDirection.y;
+                }
+                if (typeof moveDirection.z === 'number') {
+                    this.capsule.position.z += moveDirection.z;
+                }
+                
+                // Calculate if moving based on the values, not vector methods
+                const movingX = Math.abs(moveDirection.x || 0) > 0.001;
+                const movingZ = Math.abs(moveDirection.z || 0) > 0.001;
+                this.isMoving = movingX || movingZ;
 
-            // Rotate character to face movement direction
-            if (this.isMoving) {
-                const angle = Math.atan2(movement.x, movement.z);
-                this.capsule.rotation.y = angle;
+                // Rotate character to face movement direction
+                if (this.isMoving && typeof moveDirection.x === 'number' && typeof moveDirection.z === 'number') {
+                    const angle = Math.atan2(moveDirection.x, moveDirection.z);
+                    this.capsule.rotation.y = angle;
+                }
+            } catch (error) {
+                console.error('Error updating character position:', error);
+                this.isMoving = false;
             }
         } else {
             this.isMoving = false;
         }
 
         // Update jumping state
-        this.isJumping = isJumping;
+        this.isJumping = !!isJumping; // Convert to boolean
 
         // Update animations
         if (this.characterModel) {
@@ -69,7 +88,12 @@ export class CharacterController {
             } else {
                 this.characterModel.playAnimation('idle');
             }
-            this.characterModel.update(deltaTime);
+            
+            try {
+                this.characterModel.update(deltaTime);
+            } catch (error) {
+                console.error('Error updating character animations:', error);
+            }
         }
     }
 
