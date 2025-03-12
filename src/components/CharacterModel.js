@@ -23,9 +23,9 @@ export class CharacterModel {
   loadModel() {
     const loader = new GLTFLoader();
     
-    // Load the character model
+    // Load the character model - fixed path without leading slash
     loader.load(
-      '/src/assets/models/character/character.glb',
+      'src/assets/models/character/character.glb',
       (gltf) => {
         this.model = gltf.scene;
         
@@ -66,9 +66,9 @@ export class CharacterModel {
   loadAnimations() {
     const loader = new GLTFLoader();
     const animations = [
-      { name: 'idle', path: '/src/assets/animations/idle.glb' },
-      { name: 'walk', path: '/src/assets/animations/walk.glb' },
-      { name: 'jump', path: '/src/assets/animations/jump.glb' }
+      { name: 'idle', path: 'src/assets/animations/idle.glb' },
+      { name: 'walk', path: 'src/assets/animations/walk.glb' },
+      { name: 'jump', path: 'src/assets/animations/jump.glb' }
     ];
     
     let animationsLoaded = 0;

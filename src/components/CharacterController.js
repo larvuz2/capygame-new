@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import * as RAPIER from '@dimforge/rapier3d-compat';
+import { CharacterModel } from './CharacterModel.js';
 
 export class CharacterController {
   constructor(world, scene, options = {}) {
@@ -23,6 +24,7 @@ export class CharacterController {
     this.acceleration = options.acceleration || 20.0;
     this.deceleration = options.deceleration || 10.0;
     this.currentSpeed = 0;
+    this.isMoving = false;
     
     // Debug flag
     this.debugMode = true;
@@ -35,6 +37,9 @@ export class CharacterController {
     
     // Add simple debug visuals
     this.createDebugVisuals();
+    
+    // Create 3D character model
+    this.characterModel = new CharacterModel(scene, this.mesh);
   }
   
   createMesh() {
@@ -43,7 +48,9 @@ export class CharacterController {
     const material = new THREE.MeshStandardMaterial({
       color: 0x4CAF50,
       roughness: 0.8,
-      metalness: 0.2
+      metalness: 0.2,
+      transparent: true,
+      opacity: 0.0 // Make the capsule invisible
     });
     
     this.mesh = new THREE.Mesh(geometry, material);
@@ -53,7 +60,11 @@ export class CharacterController {
     this.scene.add(this.mesh);
     
     const indicatorGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.4);
-    const indicatorMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const indicatorMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.0 // Make the direction indicator invisible too
+    });
     this.directionIndicator = new THREE.Mesh(indicatorGeometry, indicatorMaterial);
     this.directionIndicator.position.set(0, 0, this.radius + 0.1);
     this.mesh.add(this.directionIndicator);
@@ -62,7 +73,11 @@ export class CharacterController {
   createDebugVisuals() {
     // Simple ground check debug ray
     const rayGeometry = new THREE.BufferGeometry();
-    const rayMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
+    const rayMaterial = new THREE.LineBasicMaterial({ 
+      color: 0xff0000,
+      transparent: true,
+      opacity: 0.0 // Make debug rays invisible
+    });
     
     // Initial positions
     const rayPositions = new Float32Array(6);
@@ -76,7 +91,7 @@ export class CharacterController {
     const jumpIndicatorMaterial = new THREE.MeshBasicMaterial({ 
       color: 0xffff00,
       transparent: true,
-      opacity: 0.7
+      opacity: 0.0 // Make jump indicator invisible
     });
     this.jumpIndicator = new THREE.Mesh(jumpIndicatorGeometry, jumpIndicatorMaterial);
     this.jumpIndicator.visible = false;
@@ -253,9 +268,10 @@ export class CharacterController {
       if (inputs.right) this.moveDirection.add(right);
       if (inputs.left) this.moveDirection.sub(right);
       
-      // Normalize movement direction if moving diagonally
+      // Normalize if moving diagonally
       if (this.moveDirection.lengthSq() > 0) {
         this.moveDirection.normalize();
+        this.isMoving = true;
         
         // Accelerate towards target speed
         this.currentSpeed += this.acceleration * deltaTime;
@@ -264,6 +280,7 @@ export class CharacterController {
         }
       } else {
         // Decelerate when no input
+        this.isMoving = false;
         this.currentSpeed -= this.deceleration * deltaTime;
         if (this.currentSpeed < 0) {
           this.currentSpeed = 0;
@@ -302,6 +319,11 @@ export class CharacterController {
       // Update mesh position to match physics body
       const position = this.rigidBody.translation();
       this.mesh.position.set(position.x, position.y, position.z);
+      
+      // Update the character model animations
+      if (this.characterModel) {
+        this.characterModel.update(deltaTime, this.isMoving, this.isGrounded);
+      }
       
     } catch (error) {
       console.error("Error in character update:", error);
