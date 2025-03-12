@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CapyGame - 3D Physics Game</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="container">
+    <div id="loading-screen">
+      <div class="loading-content">
+        <h1>CapyGame</h1>
+        <div class="loader"></div>
+        <p>Loading physics engine...</p>
+      </div>
+    </div>
+    <div id="game-container">
+      <canvas id="game"></canvas>
+      <div id="controls-hint">
+        <p>WASD to move, SPACE to jump, Mouse to look around</p>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
