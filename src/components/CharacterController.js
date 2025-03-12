@@ -55,7 +55,7 @@ export class CharacterController {
     
     this.mesh = new THREE.Mesh(geometry, material);
     this.mesh.position.copy(this.position);
-    this.mesh.castShadow = true;
+    this.mesh.castShadow = false; // Disable shadow casting on the capsule
     this.mesh.receiveShadow = false;
     this.scene.add(this.mesh);
     
