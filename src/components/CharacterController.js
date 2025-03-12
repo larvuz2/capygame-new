@@ -10,13 +10,13 @@ export class CharacterController {
     this.radius = options.radius || 0.5;
     this.height = options.height || 2.0;
     this.position = options.position || new THREE.Vector3(0, 3, 0);
-    this.maxSpeed = options.maxSpeed || 5.0;
+    this.maxSpeed = options.maxSpeed || 2.2;
     this.rotationSpeed = options.rotationSpeed || 5.0;
     
     // Simplified physics parameters
     this.moveDirection = new THREE.Vector3();
     this.isGrounded = false;
-    this.jumpStrength = 25; // Simple strong jump force
+    this.jumpStrength = 10; // Simple strong jump force
     this.jumpRequested = false;
     
     // Movement enhancement parameters
@@ -250,41 +250,61 @@ export class CharacterController {
       // Set movement direction based on inputs
       if (inputs.forward) this.moveDirection.add(forward);
       if (inputs.backward) this.moveDirection.sub(forward);
-      if (inputs.left) this.moveDirection.sub(right);
       if (inputs.right) this.moveDirection.add(right);
+      if (inputs.left) this.moveDirection.sub(right);
       
-      // Update character rotation
-      const isMoving = this.moveDirection.lengthSq() > 0;
-      if (isMoving) {
+      // Normalize movement direction if moving diagonally
+      if (this.moveDirection.lengthSq() > 0) {
         this.moveDirection.normalize();
-        const targetRotation = new THREE.Quaternion();
-        targetRotation.setFromUnitVectors(new THREE.Vector3(0, 0, 1), this.moveDirection);
-        this.mesh.quaternion.slerp(targetRotation, deltaTime * this.rotationSpeed);
+        
+        // Accelerate towards target speed
+        this.currentSpeed += this.acceleration * deltaTime;
+        if (this.currentSpeed > this.maxSpeed) {
+          this.currentSpeed = this.maxSpeed;
+        }
+      } else {
+        // Decelerate when no input
+        this.currentSpeed -= this.deceleration * deltaTime;
+        if (this.currentSpeed < 0) {
+          this.currentSpeed = 0;
+        }
       }
       
-      // Update speed with acceleration/deceleration
-      const targetSpeed = isMoving ? this.maxSpeed : 0;
+      // Apply movement force
+      if (this.currentSpeed > 0) {
+        // Scale movement direction by current speed
+        const moveForce = this.moveDirection.clone().multiplyScalar(this.currentSpeed);
+        
+        // Set horizontal velocity directly
+        const newVelocity = new RAPIER.Vector3(
+          moveForce.x,
+          velocity.y, // Preserve vertical velocity (gravity/jumping)
+          moveForce.z
+        );
+        
+        this.rigidBody.setLinvel(newVelocity, true);
+        
+        // Rotate character to face movement direction
+        if (this.moveDirection.lengthSq() > 0) {
+          const targetRotation = Math.atan2(this.moveDirection.x, this.moveDirection.z);
+          
+          // Get current rotation
+          const currentRotation = this.mesh.rotation.y;
+          
+          // Smoothly interpolate rotation
+          const newRotation = currentRotation + (targetRotation - currentRotation) * 
+            Math.min(this.rotationSpeed * deltaTime, 1.0);
+          
+          this.mesh.rotation.y = newRotation;
+        }
+      }
       
-      this.currentSpeed = isMoving
-        ? Math.min(this.currentSpeed + this.acceleration * deltaTime, targetSpeed)
-        : Math.max(this.currentSpeed - this.deceleration * deltaTime, 0);
-      
-      // Set horizontal velocity while preserving vertical velocity
-      // This simple approach keeps the jump physics separate from movement
-      const moveVelocity = new RAPIER.Vector3(
-        this.moveDirection.x * this.currentSpeed,
-        velocity.y, // Preserve the vertical velocity from jumping/gravity
-        this.moveDirection.z * this.currentSpeed
-      );
-      
-      this.rigidBody.setLinvel(moveVelocity, true);
-      
-      // Update mesh position from physics
+      // Update mesh position to match physics body
       const position = this.rigidBody.translation();
       this.mesh.position.set(position.x, position.y, position.z);
       
     } catch (error) {
-      console.error("Error in update:", error);
+      console.error("Error in character update:", error);
     }
   }
 }

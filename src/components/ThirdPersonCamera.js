@@ -6,8 +6,8 @@ export class ThirdPersonCamera {
     this.target = target;
     
     // Camera parameters
-    this.distance = options.distance || 5;
-    this.height = options.height || 2;
+    this.distance = options.distance || 6;
+    this.height = options.height || 2.5;
     this.smoothing = options.smoothing || 0.05;
     
     // Camera angles

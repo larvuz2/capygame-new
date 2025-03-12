@@ -9,19 +9,19 @@ export class GUIController {
     // Store original values to allow resetting
     this.originalValues = {
       // Character movement
-      maxSpeed: character.maxSpeed,
-      acceleration: character.acceleration,
-      deceleration: character.deceleration,
-      jumpStrength: character.jumpStrength,
-      rotationSpeed: character.rotationSpeed,
+      maxSpeed: 2.2,
+      acceleration: 20.0,
+      deceleration: 10.0,
+      jumpStrength: 10,
+      rotationSpeed: 5.0,
       
       // Camera
-      cameraDistance: thirdPersonCamera.distance,
-      cameraHeight: thirdPersonCamera.height,
-      cameraSmoothing: thirdPersonCamera.smoothing,
+      cameraDistance: 6,
+      cameraHeight: 2.5,
+      cameraSmoothing: 0.05,
       
       // Physics/Gravity
-      gravity: world.gravity.y
+      gravity: -30.0
     };
     
     // Settings object to be manipulated by dat.gui

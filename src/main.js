@@ -37,7 +37,7 @@ async function init() {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   
   // Create physics world with standard Earth gravity
-  const gravity = new RAPIER.Vector3(0.0, -9.81 * 3, 0.0); // Stronger gravity for gameplay
+  const gravity = new RAPIER.Vector3(0.0, -30.0, 0.0); // Stronger gravity for gameplay
   world = new RAPIER.World(gravity);
   console.log("Physics world created with gravity:", gravity.y);
   
