@@ -1,156 +1,68 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
 export class CharacterModel {
-  constructor(scene, parentMesh) {
-    this.scene = scene;
-    this.parentMesh = parentMesh;
-    this.model = null;
-    this.mixer = null;
-    this.animations = {
-      idle: null,
-      walk: null,
-      jump: null
-    };
-    this.currentAnimation = null;
-    this.currentAnimationName = '';
-    this.loaded = false;
-    
-    // Load the character model and animations
-    this.loadModel();
-  }
-  
-  loadModel() {
-    const loader = new GLTFLoader();
-    
-    // For deployed environment, use simple paths starting at public folder root
-    loader.load(
-      '/character.glb',
-      (gltf) => {
-        this.model = gltf.scene;
+    constructor() {
+        this.model = null;
+        this.mixer = null;
+        this.animations = {
+            idle: null,
+            walk: null,
+            jump: null
+        };
+        this.currentAnimation = null;
+    }
+
+    async load() {
+        const loader = new GLTFLoader();
         
-        // Add the model as a child of the parent mesh (capsule collider)
-        this.parentMesh.add(this.model);
-        
-        // Position the model relative to the parent
-        this.model.position.set(0, -this.parentMesh.geometry.parameters.height / 2, 0);
-        
-        // Adjust model scale if needed
-        this.model.scale.set(1, 1, 1);
-        
-        // Make the model cast shadows
-        this.model.traverse((node) => {
-          if (node.isMesh) {
-            node.castShadow = true;
-            node.receiveShadow = true;
-          }
-        });
-        
-        // Create animation mixer
-        this.mixer = new THREE.AnimationMixer(this.model);
-        
-        console.log('Character model loaded successfully');
-        
-        // Now load animations
-        this.loadAnimations();
-      },
-      (xhr) => {
-        console.log(`Character model ${(xhr.loaded / xhr.total) * 100}% loaded`);
-      },
-      (error) => {
-        console.error('Error loading character model:', error);
-      }
-    );
-  }
-  
-  loadAnimations() {
-    const loader = new GLTFLoader();
-    const animations = [
-      { name: 'idle', path: '/idle.glb' },
-      { name: 'walk', path: '/walk.glb' },
-      { name: 'jump', path: '/jump.glb' }
-    ];
-    
-    let animationsLoaded = 0;
-    
-    animations.forEach(animation => {
-      loader.load(
-        animation.path,
-        (gltf) => {
-          if (gltf.animations && gltf.animations.length > 0) {
-            this.animations[animation.name] = gltf.animations[0];
-            console.log(`${animation.name} animation loaded successfully`);
-          } else {
-            console.warn(`No animations found in ${animation.path}`);
-          }
-          
-          animationsLoaded++;
-          
-          // When all animations are loaded, set the default animation to idle
-          if (animationsLoaded === animations.length) {
-            this.loaded = true;
-            // Only play idle if we actually have it
-            if (this.animations.idle) {
-              this.playAnimation('idle');
-            }
-          }
-        },
-        (xhr) => {
-          console.log(`${animation.name} animation ${(xhr.loaded / xhr.total) * 100}% loaded`);
-        },
-        (error) => {
-          console.error(`Error loading ${animation.name} animation:`, error);
-          animationsLoaded++;
+        try {
+            // Load the character model
+            const characterGltf = await loader.loadAsync('/models/character/character.glb');
+            this.model = characterGltf.scene;
+            
+            // Load animations
+            const [idleGltf, walkGltf, jumpGltf] = await Promise.all([
+                loader.loadAsync('/models/character/idle.glb'),
+                loader.loadAsync('/models/character/walk.glb'),
+                loader.loadAsync('/models/character/jump.glb')
+            ]);
+
+            // Set up animation mixer
+            this.mixer = new THREE.AnimationMixer(this.model);
+            
+            // Store animations
+            if (idleGltf.animations.length > 0) this.animations.idle = idleGltf.animations[0];
+            if (walkGltf.animations.length > 0) this.animations.walk = walkGltf.animations[0];
+            if (jumpGltf.animations.length > 0) this.animations.jump = jumpGltf.animations[0];
+            
+            // Play idle animation by default
+            this.playAnimation('idle');
+            
+            return this.model;
+        } catch (error) {
+            console.error('Error loading character model or animations:', error);
+            throw error;
         }
-      );
-    });
-  }
-  
-  playAnimation(animationName) {
-    if (!this.loaded || !this.mixer) {
-      return false;
     }
-    
-    // Make sure the animation exists
-    if (!this.animations[animationName]) {
-      console.warn(`Animation ${animationName} not found`);
-      return false;
+
+    playAnimation(animationName) {
+        const animation = this.animations[animationName];
+        if (!animation || !this.mixer) return;
+
+        // Stop current animation
+        if (this.currentAnimation) {
+            this.currentAnimation.fadeOut(0.5);
+        }
+
+        // Play new animation
+        this.currentAnimation = this.mixer.clipAction(animation);
+        this.currentAnimation.reset().fadeIn(0.5).play();
     }
-    
-    // Don't restart the same animation
-    if (this.currentAnimationName === animationName) {
-      return true;
+
+    update(deltaTime) {
+        if (this.mixer) {
+            this.mixer.update(deltaTime);
+        }
     }
-    
-    // Stop current animation
-    if (this.currentAnimation) {
-      this.currentAnimation.fadeOut(0.5);
-    }
-    
-    // Play new animation
-    this.currentAnimation = this.mixer.clipAction(this.animations[animationName]);
-    this.currentAnimation.reset().fadeIn(0.5).play();
-    this.currentAnimationName = animationName;
-    
-    console.log(`Playing ${animationName} animation`);
-    return true;
-  }
-  
-  update(deltaTime, isMoving, isGrounded) {
-    // Update animation mixer
-    if (this.mixer) {
-      this.mixer.update(deltaTime);
-    }
-    
-    // Only update animations if we actually have animations loaded
-    if (this.loaded) {
-      if (!isGrounded && this.animations.jump) {
-        this.playAnimation('jump');
-      } else if (isMoving && this.animations.walk) {
-        this.playAnimation('walk');
-      } else if (this.animations.idle) {
-        this.playAnimation('idle');
-      }
-    }
-  }
 }
