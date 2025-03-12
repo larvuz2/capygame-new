@@ -4,9 +4,10 @@ import { CharacterController } from './components/CharacterController.js';
 import { createScene } from './components/Scene.js';
 import { ThirdPersonCamera } from './components/ThirdPersonCamera.js';
 import { InputManager } from './utils/InputManager.js';
+import { GUIController } from './utils/GUIController.js';
 
 // Global variables
-let world, scene, renderer, camera, character, thirdPersonCamera, inputManager;
+let world, scene, renderer, camera, character, thirdPersonCamera, inputManager, guiController;
 const physicsClock = new THREE.Clock();
 
 // Initialize the game
@@ -68,6 +69,9 @@ async function init() {
   // Setup input manager
   inputManager = new InputManager();
   inputManager.initialize();
+  
+  // Initialize GUI controller
+  guiController = new GUIController(world, character, thirdPersonCamera);
   
   // Handle window resize
   window.addEventListener('resize', onWindowResize);

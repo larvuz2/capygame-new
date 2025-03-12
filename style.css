@@ -4,16 +4,18 @@
   box-sizing: border-box;
 }
 
-body {
-  font-family: 'Arial', sans-serif;
+body, html {
+  width: 100%;
+  height: 100%;
   overflow: hidden;
+  font-family: Arial, sans-serif;
   background-color: #000;
 }
 
 .container {
   position: relative;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
 }
 
 #game-container {
@@ -24,10 +26,50 @@ body {
   height: 100%;
 }
 
-#game {
+canvas {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+#loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  color: white;
+  transition: opacity 0.5s ease-in-out;
+}
+
+.loading-content {
+  text-align: center;
+}
+
+.loading-content h1 {
+  font-size: 3rem;
+  margin-bottom: 2rem;
+  color: #4CAF50;
+}
+
+.loader {
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #4CAF50;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 #controls-hint {
@@ -35,55 +77,32 @@ body {
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
+  padding: 10px 20px;
   background-color: rgba(0, 0, 0, 0.5);
   color: white;
-  padding: 10px 20px;
   border-radius: 5px;
-  font-size: 14px;
   pointer-events: none;
-  transition: opacity 0.3s ease;
 }
 
-#loading-screen {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: #000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 100;
-  transition: opacity 0.5s ease;
-}
-
-#loading-screen.hidden {
+.hidden {
   opacity: 0;
   pointer-events: none;
 }
 
-.loading-content {
-  text-align: center;
-  color: white;
+/* GUI Panel Styles */
+.dg.ac {
+  z-index: 10 !important;
 }
 
-.loading-content h1 {
-  font-size: 3rem;
-  margin-bottom: 20px;
-  color: #4CAF50;
+.dg .c input[type=text] {
+  line-height: normal;
 }
 
-.loader {
-  width: 50px;
-  height: 50px;
-  border: 5px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  border-top-color: #4CAF50;
-  margin: 0 auto 20px;
-  animation: spin 1s ease-in-out infinite;
+.dg .c select {
+  color: #000;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+#gui-info {
+  z-index: 10;
+  pointer-events: none;
 }
