@@ -3,108 +3,43 @@ import * as RAPIER from '@dimforge/rapier3d-compat';
 import { CharacterModel } from './CharacterModel.js';
 
 export class CharacterController {
-  constructor(scene, world, params = {}) {
-    // Get required parameters or use defaults
-    this.scene = scene;
+  constructor(world, scene, options = {}) {
     this.world = world;
-    this.position = params.position || new THREE.Vector3(0, 2, 0);
-    this.radius = params.radius || 0.4;
-    this.height = params.height || 1.8;
-    this.maxSpeed = params.maxSpeed || 5.0;
-    this.turnSpeed = params.turnSpeed || 10.0;
-    this.acceleration = params.acceleration || 15.0;
-    this.deceleration = params.deceleration || 25.0;
-    this.jumpForce = params.jumpForce || 10.0;
+    this.scene = scene;
     
-    // State variables
-    this.moveDirection = new THREE.Vector3(0, 0, 0);
-    this.currentSpeed = 0;
-    this.targetSpeed = 0;
-    this.isMoving = false;
-    this.isJumping = false;
+    // Character parameters
+    this.radius = options.radius || 0.5;
+    this.height = options.height || 2.0;
+    this.position = options.position || new THREE.Vector3(0, 3, 0);
+    this.maxSpeed = options.maxSpeed || 5.0;
+    this.rotationSpeed = options.rotationSpeed || 5.0;
+    
+    // Simplified physics parameters
+    this.moveDirection = new THREE.Vector3();
     this.isGrounded = false;
-    this.canJump = true;
-    this.direction = 0; // Direction angle in radians
+    this.jumpStrength = 25; // Simple strong jump force
+    this.jumpRequested = false;
     
-    // Debug properties
-    this.showDebugVisuals = params.showDebugVisuals || false;
-    this.debugRay = null;
-    this.debugRayPositions = null;
+    // Movement enhancement parameters
+    this.acceleration = options.acceleration || 20.0;
+    this.deceleration = options.deceleration || 10.0;
+    this.currentSpeed = 0;
+    this.isMoving = false;
     
-    // Create elements
+    // Debug flag
+    this.debugMode = true;
+    
+    // Create character visual representation
     this.createMesh();
-    this.createRigidBody();
     
-    if (this.showDebugVisuals) {
-      this.createDebugVisuals();
-    }
+    // Create character physics body
+    this.createPhysicsBody();
+    
+    // Add simple debug visuals
+    this.createDebugVisuals();
     
     // Create 3D character model
     this.characterModel = new CharacterModel(scene, this.mesh);
-    
-    // Add a debug model that will be shown if the character model fails to load
-    this.createFallbackModel();
-  }
-  
-  // Create a fallback model that will be visible if the main model fails to load
-  createFallbackModel() {
-    // Create a simple humanoid shape using basic geometries
-    const debugGroup = new THREE.Group();
-    
-    // Head (sphere)
-    const headGeometry = new THREE.SphereGeometry(0.25, 16, 16);
-    const headMaterial = new THREE.MeshStandardMaterial({ color: 0xffcc00 });
-    const head = new THREE.Mesh(headGeometry, headMaterial);
-    head.position.y = 0.75;
-    debugGroup.add(head);
-    
-    // Body (box)
-    const bodyGeometry = new THREE.BoxGeometry(0.5, 0.8, 0.3);
-    const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-    body.position.y = 0.2;
-    debugGroup.add(body);
-    
-    // Arms (cylinders)
-    const armGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.6);
-    const armMaterial = new THREE.MeshStandardMaterial({ color: 0x0000ff });
-    
-    const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-    leftArm.position.set(-0.35, 0.3, 0);
-    leftArm.rotation.z = Math.PI / 2;
-    debugGroup.add(leftArm);
-    
-    const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-    rightArm.position.set(0.35, 0.3, 0);
-    rightArm.rotation.z = -Math.PI / 2;
-    debugGroup.add(rightArm);
-    
-    // Legs (cylinders)
-    const legGeometry = new THREE.CylinderGeometry(0.12, 0.12, 0.7);
-    const legMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
-    
-    const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-    leftLeg.position.set(-0.2, -0.35, 0);
-    debugGroup.add(leftLeg);
-    
-    const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-    rightLeg.position.set(0.2, -0.35, 0);
-    debugGroup.add(rightLeg);
-    
-    // Add the debug model to the mesh but hide it initially
-    debugGroup.visible = false;
-    debugGroup.name = "fallbackModel";
-    debugGroup.position.y = -this.height / 2;
-    this.mesh.add(debugGroup);
-    this.fallbackModel = debugGroup;
-    
-    // Check after 5 seconds if the model loaded, if not show the fallback
-    setTimeout(() => {
-      if (!this.characterModel.loaded) {
-        console.warn("Character model didn't load after 5 seconds, showing fallback model");
-        this.fallbackModel.visible = true;
-      }
-    }, 5000);
   }
   
   createMesh() {
@@ -144,174 +79,224 @@ export class CharacterController {
     const rayPositions = new Float32Array(6);
     rayGeometry.setAttribute('position', new THREE.BufferAttribute(rayPositions, 3));
     
-    this.debugRay = new THREE.Line(rayGeometry, rayMaterial);
-    this.scene.add(this.debugRay);
-    this.debugRayPositions = rayPositions;
+    this.rayVisual = new THREE.Line(rayGeometry, rayMaterial);
+    this.scene.add(this.rayVisual);
+    
+    // Jump indicator - a simple sphere that appears when jumping
+    const jumpIndicatorGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+    const jumpIndicatorMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0xffff00,
+      transparent: true,
+      opacity: 0.7
+    });
+    this.jumpIndicator = new THREE.Mesh(jumpIndicatorGeometry, jumpIndicatorMaterial);
+    this.jumpIndicator.visible = false;
+    this.scene.add(this.jumpIndicator);
   }
   
-  createRigidBody() {
-    try {
-      // Create rigid body for character physics
-      const rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(this.position.x, this.position.y, this.position.z);
-        
-      this.rigidBody = this.world.createRigidBody(rigidBodyDesc);
-      
-      // Create collider for character capsule
-      const capsuleHeight = this.height - this.radius * 2;
-      const colliderDesc = RAPIER.ColliderDesc.capsule(capsuleHeight / 2, this.radius)
-        .setTranslation(0, 0, 0);
-        
-      // Add friction and restitution
-      colliderDesc.setFriction(0.1);
-      colliderDesc.setRestitution(0.0);
-      
-      // Disable rotation to keep character upright
-      this.rigidBody.setEnabledRotations(false, false, false, true);
-      
-      this.collider = this.world.createCollider(colliderDesc, this.rigidBody);
-      
-      console.log("Character physics body created at:", this.rigidBody.translation());
-    } catch (error) {
-      console.error("Error creating character physics body:", error);
-    }
+  createPhysicsBody() {
+    // Create a dynamic rigid body for the character
+    const rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
+      .setTranslation(this.position.x, this.position.y, this.position.z)
+      .lockRotations(); // Prevent tipping over
+    
+    this.rigidBody = this.world.createRigidBody(rigidBodyDesc);
+    
+    // Create a capsule collider
+    const capsuleHeight = this.height - this.radius * 2;
+    const colliderDesc = RAPIER.ColliderDesc.capsule(capsuleHeight / 2, this.radius)
+      .setFriction(0.7)
+      .setRestitution(0.0);
+    
+    this.collider = this.world.createCollider(colliderDesc, this.rigidBody);
+    
+    // Debug log
+    console.log("Character physics body created at:", this.position);
   }
-  
-  applyInput(input, camera, deltaTime) {
-    try {
-      // Get camera forward and right directions (ignoring Y to keep character grounded)
-      const cameraForward = new THREE.Vector3();
-      const cameraRight = new THREE.Vector3();
-      
-      camera.getWorldDirection(cameraForward);
-      cameraForward.y = 0;
-      cameraForward.normalize();
-      
-      cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward).normalize();
-      
-      // Process WASD movement
-      this.moveDirection.set(0, 0, 0);
-      
-      if (input.moveForward) {
-        this.moveDirection.add(cameraForward);
-      }
-      if (input.moveBackward) {
-        this.moveDirection.sub(cameraForward);
-      }
-      if (input.moveLeft) {
-        this.moveDirection.sub(cameraRight);
-      }
-      if (input.moveRight) {
-        this.moveDirection.add(cameraRight);
-      }
-      
-      // Normalize movement vector to prevent faster diagonal movement
-      if (this.moveDirection.lengthSq() > 0) {
-        this.moveDirection.normalize();
-        this.isMoving = true;
-        
-        // Set direction to match movement
-        if (this.moveDirection.lengthSq() > 0.01) {
-          this.direction = Math.atan2(this.moveDirection.x, this.moveDirection.z);
-        }
-      } else {
-        this.isMoving = false;
-      }
-      
-      // Handle jumping
-      if (input.jump && this.canJump && this.isGrounded) {
-        // Apply an upward impulse for jumping
-        const jumpVelocity = new RAPIER.Vector3(0.0, this.jumpForce, 0.0);
-        this.rigidBody.applyImpulse(jumpVelocity, true);
-        this.isJumping = true;
-        this.canJump = false; // Prevent multiple jumps
-        
-        // Allow jumping again after a short delay
-        setTimeout(() => {
-          this.canJump = true;
-        }, 200);
-      }
-      
-      // Update mesh rotation to face movement direction
-      if (this.isMoving) {
-        const targetRotation = this.direction;
-        
-        // Smoothly interpolate current rotation to target rotation
-        const currentRotation = this.mesh.rotation.y;
-        let angleDiff = targetRotation - currentRotation;
-        
-        // Handle angle wrapping
-        if (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        if (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-        
-        // Apply smooth rotation
-        this.mesh.rotation.y += angleDiff * this.turnSpeed * deltaTime;
-      }
-      
-    } catch (error) {
-      console.error("Error in character input:", error);
-    }
-  }
-  
+
   checkGrounded() {
     try {
-      // Get current position
-      const position = this.rigidBody.translation();
+      const translation = this.rigidBody.translation();
       
-      // Cast a ray downward to check if the character is grounded
-      const rayDir = { x: 0.0, y: -1.0, z: 0.0 };
-      const rayOrigin = { x: position.x, y: position.y, z: position.z };
-      const rayLength = this.radius + 0.1; // Slightly more than the radius
+      // Simple ground check with a short ray
+      const rayOrigin = {
+        x: translation.x,
+        y: translation.y - (this.height / 2) + 0.1, // Just above bottom of capsule
+        z: translation.z
+      };
       
-      if (this.showDebugVisuals && this.debugRayPositions) {
-        // Update debug ray visualization
-        this.debugRayPositions[0] = rayOrigin.x;
-        this.debugRayPositions[1] = rayOrigin.y;
-        this.debugRayPositions[2] = rayOrigin.z;
-        this.debugRayPositions[3] = rayOrigin.x;
-        this.debugRayPositions[4] = rayOrigin.y - rayLength;
-        this.debugRayPositions[5] = rayOrigin.z;
-        
-        this.debugRay.geometry.attributes.position.needsUpdate = true;
+      const rayEnd = {
+        x: translation.x,
+        y: translation.y - (this.height / 2) - 0.2, // Short distance below
+        z: translation.z
+      };
+      
+      // Update debug ray
+      if (this.rayVisual) {
+        const positions = this.rayVisual.geometry.attributes.position.array;
+        positions[0] = rayOrigin.x;
+        positions[1] = rayOrigin.y;
+        positions[2] = rayOrigin.z;
+        positions[3] = rayEnd.x;
+        positions[4] = rayEnd.y;
+        positions[5] = rayEnd.z;
+        this.rayVisual.geometry.attributes.position.needsUpdate = true;
       }
       
-      // Perform the raycast
-      const ray = new RAPIER.Ray(rayOrigin, rayDir);
-      const hit = this.world.castRay(ray, rayLength, true);
+      // Cast ray using Rapier
+      const rayDir = new RAPIER.Vector3(0, -1, 0);
+      const ray = new RAPIER.Ray(
+        new RAPIER.Vector3(rayOrigin.x, rayOrigin.y, rayOrigin.z), 
+        rayDir
+      );
       
-      // Character is grounded if the ray hits something
+      // Cast the ray excluding character's own collider
+      const hit = this.world.castRay(ray, 0.3, true, null, null, this.collider);
+      
+      // Update grounded state
       const wasGrounded = this.isGrounded;
-      this.isGrounded = hit != null;
+      this.isGrounded = hit !== null;
       
-      // If just landed, reset jumping state
-      if (this.isGrounded && !wasGrounded) {
-        this.isJumping = false;
+      // Change ray color based on grounded state
+      if (this.rayVisual) {
+        this.rayVisual.material.color.set(this.isGrounded ? 0x00ff00 : 0xff0000);
       }
       
-      // Log ground state changes for debugging
-      if (this.isGrounded !== wasGrounded) {
+      // Debug log ground state changes
+      if (wasGrounded !== this.isGrounded) {
         console.log("Grounded state changed to:", this.isGrounded);
       }
       
+      return this.isGrounded;
+      
     } catch (error) {
-      console.error("Error in check grounded:", error);
+      console.error("Error in checkGrounded:", error);
+      return false;
     }
   }
   
-  update(deltaTime) {
+  jump() {
+    if (!this.isGrounded) return false;
+    
     try {
+      // Get current velocity
+      const velocity = this.rigidBody.linvel();
+      
+      // Create an upward velocity vector, preserving horizontal movement
+      const jumpVelocity = new RAPIER.Vector3(
+        velocity.x,
+        this.jumpStrength, // Strong upward force
+        velocity.z
+      );
+      
+      // Apply the velocity directly
+      this.rigidBody.setLinvel(jumpVelocity, true);
+      
+      // Make sure body is awake
+      this.rigidBody.wakeUp();
+      
+      // Show jump indicator
+      if (this.jumpIndicator) {
+        const pos = this.rigidBody.translation();
+        this.jumpIndicator.position.set(pos.x, pos.y - 1, pos.z);
+        this.jumpIndicator.visible = true;
+        
+        // Hide after 0.5 seconds
+        setTimeout(() => {
+          this.jumpIndicator.visible = false;
+        }, 500);
+      }
+      
+      console.log("JUMP EXECUTED with velocity:", jumpVelocity.y);
+      return true;
+      
+    } catch (error) {
+      console.error("Error in jump:", error);
+      return false;
+    }
+  }
+  
+  update(inputs, deltaTime, camera) {
+    try {
+      if (!this.rigidBody) return;
+      
       // Check if the character is on the ground
       this.checkGrounded();
+      
+      // Handle jump input - Simple approach!
+      if (inputs.jump && !this.jumpRequested && this.isGrounded) {
+        this.jump();
+        this.jumpRequested = true;
+      }
+      
+      if (!inputs.jump) {
+        this.jumpRequested = false;
+      }
       
       // Get current velocity
       const velocity = this.rigidBody.linvel();
       
-      // Handle movement and acceleration
+      // Debug output - log velocity periodically
+      if (this.debugMode && Math.random() < 0.01) {
+        console.log("Velocity:", {
+          x: velocity.x.toFixed(2),
+          y: velocity.y.toFixed(2),
+          z: velocity.z.toFixed(2)
+        });
+      }
+      
+      // Handle movement
+      this.moveDirection.set(0, 0, 0);
+      
+      // Get camera-relative directions
+      const cameraQuaternion = camera ? camera.quaternion : new THREE.Quaternion();
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(cameraQuaternion);
+      forward.y = 0;
+      forward.normalize();
+      
+      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(cameraQuaternion);
+      right.y = 0;
+      right.normalize();
+      
+      // Set movement direction based on inputs
+      if (inputs.forward) this.moveDirection.add(forward);
+      if (inputs.backward) this.moveDirection.sub(forward);
+      if (inputs.left) this.moveDirection.sub(right);
+      if (inputs.right) this.moveDirection.add(right);
+      
+      // Normalize if moving diagonally
+      if (this.moveDirection.lengthSq() > 0) {
+        this.moveDirection.normalize();
+        this.isMoving = true;
+      } else {
+        this.isMoving = false;
+      }
+      
+      // Update character rotation
       if (this.isMoving) {
-        // Accelerate towards target speed
-        this.targetSpeed = this.maxSpeed;
-        this.currentSpeed += this.acceleration * deltaTime;
+        const targetRotation = Math.atan2(this.moveDirection.x, this.moveDirection.z);
+        const currentRotation = this.mesh.rotation.y;
         
+        // Smooth rotation
+        let newRotation = currentRotation;
+        const deltaRotation = targetRotation - currentRotation;
+        
+        // Handle -PI to PI transition
+        if (deltaRotation > Math.PI) {
+          newRotation += (deltaRotation - 2 * Math.PI) * this.rotationSpeed * deltaTime;
+        } else if (deltaRotation < -Math.PI) {
+          newRotation += (deltaRotation + 2 * Math.PI) * this.rotationSpeed * deltaTime;
+        } else {
+          newRotation += deltaRotation * this.rotationSpeed * deltaTime;
+        }
+        
+        this.mesh.rotation.y = newRotation;
+      }
+      
+      // Accelerate or decelerate smoothly
+      if (this.isMoving) {
+        // Accelerate up to max speed
+        this.currentSpeed += this.acceleration * deltaTime;
         if (this.currentSpeed > this.maxSpeed) {
           this.currentSpeed = this.maxSpeed;
         }
