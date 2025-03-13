@@ -23,9 +23,12 @@ export class CharacterModel {
   loadModel() {
     const loader = new GLTFLoader();
     
-    // Load the character model from public folder
+    // Use a path that will work both locally and in production
+    // First try the base-relative path (works in most deployments)
+    console.log("Attempting to load character model...");
+    
     loader.load(
-      '/models/character/character.glb',
+      './models/character/character.glb',
       (gltf) => {
         this.model = gltf.scene;
         
@@ -59,6 +62,42 @@ export class CharacterModel {
       },
       (error) => {
         console.error('Error loading character model:', error);
+        console.log("Attempting fallback loading path...");
+        
+        // Try alternate path as fallback
+        this.loadModelFallback();
+      }
+    );
+  }
+  
+  // Fallback loading method with alternate path
+  loadModelFallback() {
+    const loader = new GLTFLoader();
+    
+    loader.load(
+      '../models/character/character.glb',
+      (gltf) => {
+        this.model = gltf.scene;
+        this.parentMesh.add(this.model);
+        this.model.position.set(0, -this.parentMesh.geometry.parameters.height / 2, 0);
+        this.model.scale.set(1, 1, 1);
+        
+        this.model.traverse((node) => {
+          if (node.isMesh) {
+            node.castShadow = true;
+            node.receiveShadow = true;
+          }
+        });
+        
+        this.mixer = new THREE.AnimationMixer(this.model);
+        console.log('Character model loaded successfully via fallback path');
+        this.loadAnimationsFallback();
+      },
+      (xhr) => {
+        console.log(`Fallback: Character model ${(xhr.loaded / xhr.total) * 100}% loaded`);
+      },
+      (error) => {
+        console.error('Error loading character model via fallback path:', error);
       }
     );
   }
@@ -66,9 +105,9 @@ export class CharacterModel {
   loadAnimations() {
     const loader = new GLTFLoader();
     const animations = [
-      { name: 'idle', path: '/models/character/idle.glb' },
-      { name: 'walk', path: '/models/character/walk.glb' },
-      { name: 'jump', path: '/models/character/jump.glb' }
+      { name: 'idle', path: './models/character/idle.glb' },
+      { name: 'walk', path: './models/character/walk.glb' },
+      { name: 'jump', path: './models/character/jump.glb' }
     ];
     
     let animationsLoaded = 0;
@@ -97,6 +136,45 @@ export class CharacterModel {
         },
         (error) => {
           console.error(`Error loading ${animation.name} animation:`, error);
+          animationsLoaded++;
+        }
+      );
+    });
+  }
+  
+  loadAnimationsFallback() {
+    const loader = new GLTFLoader();
+    const animations = [
+      { name: 'idle', path: '../models/character/idle.glb' },
+      { name: 'walk', path: '../models/character/walk.glb' },
+      { name: 'jump', path: '../models/character/jump.glb' }
+    ];
+    
+    let animationsLoaded = 0;
+    
+    animations.forEach(animation => {
+      loader.load(
+        animation.path,
+        (gltf) => {
+          if (gltf.animations && gltf.animations.length > 0) {
+            this.animations[animation.name] = gltf.animations[0];
+            console.log(`${animation.name} animation loaded successfully via fallback`);
+          } else {
+            console.warn(`No animations found in ${animation.path}`);
+          }
+          
+          animationsLoaded++;
+          
+          if (animationsLoaded === animations.length) {
+            this.loaded = true;
+            this.playAnimation('idle');
+          }
+        },
+        (xhr) => {
+          console.log(`Fallback: ${animation.name} animation ${(xhr.loaded / xhr.total) * 100}% loaded`);
+        },
+        (error) => {
+          console.error(`Error loading ${animation.name} animation via fallback:`, error);
           animationsLoaded++;
         }
       );
