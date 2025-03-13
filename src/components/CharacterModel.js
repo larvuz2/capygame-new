@@ -55,11 +55,20 @@ export class CharacterModel {
         // Adjust model scale if needed
         this.model.scale.set(1, 1, 1);
         
-        // Make the model cast shadows
+        // Make the model cast shadows and ensure visibility
         this.model.traverse((node) => {
           if (node.isMesh) {
             node.castShadow = true;
             node.receiveShadow = true;
+            
+            // Ensure the material is visible
+            if (node.material) {
+              node.material.transparent = false;
+              node.material.opacity = 1.0;
+              node.material.visible = true;
+              node.visible = true;
+              console.log(`Made mesh visible: ${node.name || 'unnamed mesh'}`);
+            }
           }
         });
         
