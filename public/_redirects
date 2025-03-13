@@ -1,0 +1,4 @@
+# Netlify redirect rules for ensuring static assets are correctly served
+/models/*  /models/:splat  200
+/assets/*  /assets/:splat  200
+/*        /index.html     200

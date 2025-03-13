@@ -1,6 +1,13 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+// Import character model and animations directly as URL objects
+// This helps Vite track these assets during build
+import characterModelURL from '../assets/models/character/character.glb?url';
+import idleAnimationURL from '../assets/models/character/idle.glb?url';
+import walkAnimationURL from '../assets/models/character/walk.glb?url';
+import jumpAnimationURL from '../assets/models/character/jump.glb?url';
+
 export class CharacterModel {
   constructor(scene, parentMesh) {
     this.scene = scene;
@@ -16,19 +23,98 @@ export class CharacterModel {
     this.currentAnimationName = '';
     this.loaded = false;
     
+    // Define the potential paths to try for model loading
+    // The order is important - we'll try each until one works
+    this.modelPaths = [
+      // Direct import URL managed by Vite (most reliable)
+      characterModelURL,
+      // Relative paths (for development and some deployments)
+      './models/character/character.glb',
+      '../models/character/character.glb',
+      // Absolute paths (for some deployment environments)
+      '/models/character/character.glb',
+      // Full URL for production (with cache busting)
+      `https://capygamevibes.netlify.app/models/character/character.glb?v=${Date.now()}`
+    ];
+    
+    // Animation paths organized by animation name
+    this.animationPaths = {
+      idle: [
+        idleAnimationURL,
+        './models/character/idle.glb',
+        '../models/character/idle.glb',
+        '/models/character/idle.glb',
+        `https://capygamevibes.netlify.app/models/character/idle.glb?v=${Date.now()}`
+      ],
+      walk: [
+        walkAnimationURL,
+        './models/character/walk.glb',
+        '../models/character/walk.glb',
+        '/models/character/walk.glb',
+        `https://capygamevibes.netlify.app/models/character/walk.glb?v=${Date.now()}`
+      ],
+      jump: [
+        jumpAnimationURL,
+        './models/character/jump.glb',
+        '../models/character/jump.glb',
+        '/models/character/jump.glb',
+        `https://capygamevibes.netlify.app/models/character/jump.glb?v=${Date.now()}`
+      ]
+    };
+    
+    // Add diagnostic info to console
+    console.log('Vite imported URLs:', {
+      character: characterModelURL,
+      idle: idleAnimationURL,
+      walk: walkAnimationURL,
+      jump: jumpAnimationURL
+    });
+    
+    // Verify if model files are accessible
+    this.verifyModelAccess();
+    
     // Load the character model and animations
     this.loadModel();
   }
   
+  // Helper method to verify model accessibility
+  verifyModelAccess() {
+    // Check the first few URLs to see if they're accessible
+    const urlsToCheck = [
+      '/models/character/character.glb',
+      characterModelURL
+    ];
+    
+    urlsToCheck.forEach(url => {
+      fetch(url, { method: 'HEAD' })
+        .then(response => {
+          console.log(`Model URL check (${url}):`, response.ok ? 'Available ✅' : 'Not found ❌', response.status);
+        })
+        .catch(error => {
+          console.error(`Model URL check (${url}): Error`, error);
+        });
+    });
+  }
+  
   loadModel() {
     const loader = new GLTFLoader();
+    console.log("Attempting to load character model with multiple paths...");
     
-    // Use a path that will work both locally and in production
-    // First try the base-relative path (works in most deployments)
-    console.log("Attempting to load character model...");
+    // Try to load the model using each path until one succeeds
+    this.tryLoadModelWithPaths(loader, this.modelPaths, 0);
+  }
+  
+  tryLoadModelWithPaths(loader, paths, index) {
+    if (index >= paths.length) {
+      console.error('All model loading attempts failed');
+      return;
+    }
+    
+    const currentPath = paths[index];
+    console.log(`Trying to load model from: ${currentPath} (attempt ${index + 1}/${paths.length})`);
     
     loader.load(
-      './models/character/character.glb',
+      currentPath,
       (gltf) => {
         this.model = gltf.scene;
         
@@ -52,133 +138,78 @@ export class CharacterModel {
         // Create animation mixer
         this.mixer = new THREE.AnimationMixer(this.model);
         
-        console.log('Character model loaded successfully');
+        console.log(`Character model loaded successfully from: ${currentPath}`);
         
         // Now load animations
         this.loadAnimations();
       },
       (xhr) => {
-        console.log(`Character model ${(xhr.loaded / xhr.total) * 100}% loaded`);
+        console.log(`Loading progress for ${currentPath}: ${(xhr.loaded / xhr.total) * 100}% loaded`);
       },
       (error) => {
-        console.error('Error loading character model:', error);
-        console.log("Attempting fallback loading path...");
+        console.error(`Error loading model from ${currentPath}:`, error);
         
-        // Try alternate path as fallback
-        this.loadModelFallback();
-      }
-    );
-  }
-  
-  // Fallback loading method with alternate path
-  loadModelFallback() {
-    const loader = new GLTFLoader();
-    
-    loader.load(
-      '../models/character/character.glb',
-      (gltf) => {
-        this.model = gltf.scene;
-        this.parentMesh.add(this.model);
-        this.model.position.set(0, -this.parentMesh.geometry.parameters.height / 2, 0);
-        this.model.scale.set(1, 1, 1);
-        
-        this.model.traverse((node) => {
-          if (node.isMesh) {
-            node.castShadow = true;
-            node.receiveShadow = true;
-          }
-        });
-        
-        this.mixer = new THREE.AnimationMixer(this.model);
-        console.log('Character model loaded successfully via fallback path');
-        this.loadAnimationsFallback();
-      },
-      (xhr) => {
-        console.log(`Fallback: Character model ${(xhr.loaded / xhr.total) * 100}% loaded`);
-      },
-      (error) => {
-        console.error('Error loading character model via fallback path:', error);
+        // Try the next path
+        this.tryLoadModelWithPaths(loader, paths, index + 1);
       }
     );
   }
   
   loadAnimations() {
     const loader = new GLTFLoader();
-    const animations = [
-      { name: 'idle', path: './models/character/idle.glb' },
-      { name: 'walk', path: './models/character/walk.glb' },
-      { name: 'jump', path: './models/character/jump.glb' }
-    ];
+    const animationNames = Object.keys(this.animationPaths);
     
-    let animationsLoaded = 0;
+    // Keep track of all animations loaded
+    this.pendingAnimations = animationNames.length;
     
-    animations.forEach(animation => {
-      loader.load(
-        animation.path,
-        (gltf) => {
-          if (gltf.animations && gltf.animations.length > 0) {
-            this.animations[animation.name] = gltf.animations[0];
-            console.log(`${animation.name} animation loaded successfully`);
-          } else {
-            console.warn(`No animations found in ${animation.path}`);
-          }
-          
-          animationsLoaded++;
-          
-          // When all animations are loaded, set the default animation to idle
-          if (animationsLoaded === animations.length) {
-            this.loaded = true;
-            this.playAnimation('idle');
-          }
-        },
-        (xhr) => {
-          console.log(`${animation.name} animation ${(xhr.loaded / xhr.total) * 100}% loaded`);
-        },
-        (error) => {
-          console.error(`Error loading ${animation.name} animation:`, error);
-          animationsLoaded++;
-        }
-      );
+    // Try to load each animation
+    animationNames.forEach(animName => {
+      this.tryLoadAnimationWithPaths(loader, animName, this.animationPaths[animName], 0);
     });
   }
   
-  loadAnimationsFallback() {
-    const loader = new GLTFLoader();
-    const animations = [
-      { name: 'idle', path: '../models/character/idle.glb' },
-      { name: 'walk', path: '../models/character/walk.glb' },
-      { name: 'jump', path: '../models/character/jump.glb' }
-    ];
+  tryLoadAnimationWithPaths(loader, animationName, paths, index) {
+    if (index >= paths.length) {
+      console.error(`All loading attempts for ${animationName} animation failed`);
+      this.pendingAnimations--;
+      this.checkAnimationsLoaded();
+      return;
+    }
     
-    let animationsLoaded = 0;
+    const currentPath = paths[index];
+    console.log(`Trying to load ${animationName} animation from: ${currentPath}`);
     
-    animations.forEach(animation => {
-      loader.load(
-        animation.path,
-        (gltf) => {
-          if (gltf.animations && gltf.animations.length > 0) {
-            this.animations[animation.name] = gltf.animations[0];
-            console.log(`${animation.name} animation loaded successfully via fallback`);
-          } else {
-            console.warn(`No animations found in ${animation.path}`);
-          }
-          
-          animationsLoaded++;
-          
-          if (animationsLoaded === animations.length) {
-            this.loaded = true;
-            this.playAnimation('idle');
-          }
-        },
-        (xhr) => {
-          console.log(`Fallback: ${animation.name} animation ${(xhr.loaded / xhr.total) * 100}% loaded`);
-        },
-        (error) => {
-          console.error(`Error loading ${animation.name} animation via fallback:`, error);
-          animationsLoaded++;
+    loader.load(
+      currentPath,
+      (gltf) => {
+        if (gltf.animations && gltf.animations.length > 0) {
+          this.animations[animationName] = gltf.animations[0];
+          console.log(`${animationName} animation loaded successfully from ${currentPath}`);
+        } else {
+          console.warn(`No animations found in ${currentPath}`);
         }
-      );
-    });
+        
+        this.pendingAnimations--;
+        this.checkAnimationsLoaded();
+      },
+      (xhr) => {
+        console.log(`${animationName} animation ${(xhr.loaded / xhr.total) * 100}% loaded`);
+      },
+      (error) => {
+        console.error(`Error loading ${animationName} animation from ${currentPath}:`, error);
+        
+        // Try the next path
+        this.tryLoadAnimationWithPaths(loader, animationName, paths, index + 1);
+      }
+    );
+  }
+  
+  checkAnimationsLoaded() {
+    if (this.pendingAnimations <= 0) {
+      this.loaded = true;
+      console.log('All animations loaded successfully!');
+      this.playAnimation('idle');
+    }
   }
   
   playAnimation(animationName) {
