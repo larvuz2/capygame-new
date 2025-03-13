@@ -16,15 +16,20 @@ export class CharacterModel {
     this.currentAnimationName = '';
     this.loaded = false;
     
-    // Simple, consistent paths for models in the public folder
-    this.modelPath = '/models/character/character.glb';
+    // Get base URL for assets - handle both development and production
+    const baseUrl = import.meta.env.PROD ? './' : '/';
+    console.log(`Using base URL for models: ${baseUrl}`);
+    
+    // Use the baseUrl for model paths
+    this.modelPath = `${baseUrl}models/character/character.glb`;
     this.animationPaths = {
-      idle: '/models/character/idle.glb',
-      walk: '/models/character/walk.glb',
-      jump: '/models/character/jump.glb'
+      idle: `${baseUrl}models/character/idle.glb`,
+      walk: `${baseUrl}models/character/walk.glb`,
+      jump: `${baseUrl}models/character/jump.glb`
     };
     
     console.log('Starting character model loading process...');
+    console.log(`Character model path: ${this.modelPath}`);
     
     // Load the character model
     this.loadModel();
