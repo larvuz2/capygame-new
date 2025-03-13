@@ -46,14 +46,22 @@ export class CharacterModel {
       (gltf) => {
         this.model = gltf.scene;
         
+        // Log the model structure before adding it
+        console.log('Model structure:', this.model);
+        
         // Add the model as a child of the parent mesh (capsule collider)
         this.parentMesh.add(this.model);
         
-        // Position the model relative to the parent capsule
-        this.model.position.set(0, -this.parentMesh.geometry.parameters.height / 2, 0);
+        // Increase model scale for better visibility
+        this.model.scale.set(3, 3, 3);
         
-        // Adjust model scale if needed
-        this.model.scale.set(1, 1, 1);
+        // Position the model relative to the parent capsule - adjust Y position to ensure visibility
+        this.model.position.set(0, -this.parentMesh.geometry.parameters.height / 2 + 0.5, 0);
+        
+        // Log model position for debugging
+        console.log('Model position:', this.model.position);
+        console.log('Parent mesh position:', this.parentMesh.position);
+        console.log('Parent mesh height:', this.parentMesh.geometry.parameters.height);
         
         // Make the model cast shadows and ensure visibility
         this.model.traverse((node) => {
@@ -63,12 +71,33 @@ export class CharacterModel {
             
             // Ensure the material is visible
             if (node.material) {
-              node.material.transparent = false;
-              node.material.opacity = 1.0;
-              node.material.visible = true;
-              node.visible = true;
-              console.log(`Made mesh visible: ${node.name || 'unnamed mesh'}`);
+              // Clone the material to avoid affecting other objects
+              if (Array.isArray(node.material)) {
+                node.material = node.material.map(mat => {
+                  const newMat = mat.clone();
+                  newMat.transparent = false;
+                  newMat.opacity = 1.0;
+                  newMat.visible = true;
+                  newMat.needsUpdate = true;
+                  return newMat;
+                });
+              } else {
+                node.material = node.material.clone();
+                node.material.transparent = false;
+                node.material.opacity = 1.0;
+                node.material.visible = true;
+                node.material.needsUpdate = true;
+              }
+              
+              // Add a bright color to make it very visible for debugging
+              if (!node.material.emissive) {
+                node.material.emissive = new THREE.Color(0x333333);
+                node.material.emissiveIntensity = 0.5;
+              }
+              
+              console.log(`Made mesh visible: ${node.name || 'unnamed mesh'} - Material:`, node.material);
             }
+            node.visible = true;
           }
         });
         
