@@ -1,15 +1,15 @@
-# Character Model
+# Character Models
 
-Place your character model file here as `character.glb`.
+The 3D character models and animations have been moved to the `/public/models/character/` directory.
+
+This is the standard location for static assets that should be served directly by the web server.
+
+Please look in that directory for the following files:
+- character.glb
+- idle.glb
+- walk.glb
+- jump.glb
 
 ## Requirements
 
-- The model should be in GLB format
-- The model should be rigged with a skeleton
-- The model should have a neutral pose that's compatible with the animations
-- The model should be facing forward (typically along the z-axis)
-- The model should be centered at the origin (0,0,0)
-
-## Notes
-
-The model will be automatically attached to the physics capsule and will inherit its movement and rotation.
+The character model should be in GLB format.
