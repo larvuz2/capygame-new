@@ -54,121 +54,75 @@ async function init() {
   );
   
   // Create character controller
-  character = new CharacterController(scene, world, {
-    position: new THREE.Vector3(0, 3, 0),
-    radius: 0.4,
-    height: 1.8,
-    showDebugVisuals: false
+  character = new CharacterController(world, scene, {
+    position: new THREE.Vector3(0, 5.0, 0), // Start higher for better visual of jumping
+    radius: 0.5,
+    height: 2.0
   });
   
-  // Create third-person camera controller
+  // Create third-person camera
   thirdPersonCamera = new ThirdPersonCamera(camera, character.mesh, {
     distance: 5,
     height: 2
   });
   
-  // Create input manager
+  // Setup input manager
   inputManager = new InputManager();
   inputManager.initialize();
   
-  // Add debug GUI if needed
-  guiController = new GUIController(character, thirdPersonCamera);
+  // Initialize GUI controller
+  guiController = new GUIController(world, character, thirdPersonCamera);
   
   // Handle window resize
-  window.addEventListener('resize', () => {
-    // Update camera aspect ratio
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    
-    // Update renderer size
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  });
+  window.addEventListener('resize', onWindowResize);
   
   // Hide loading screen
-  if (loadingScreen) {
-    loadingScreen.style.opacity = '0';
-    setTimeout(() => {
-      loadingScreen.style.display = 'none';
-    }, 500);
-  }
+  loadingScreen.classList.add('hidden');
   
-  // Start game loop
+  // Start the game loop
   physicsClock.start();
   requestAnimationFrame(gameLoop);
-
-  // Add character spotlight for better visibility
-  const characterLight = addCharacterSpotlight(scene, character);
 }
 
-// Game loop
+// Handle window resize
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// Main game loop
 function gameLoop() {
-  try {
-    // Calculate delta time for physics
-    const deltaTime = Math.min(physicsClock.getDelta(), 0.1); // Cap at 0.1 to prevent large jumps
-    
-    // Step the physics world
+  requestAnimationFrame(gameLoop);
+  
+  const deltaTime = physicsClock.getDelta();
+  
+  // Step the physics world
+  if (world) {
     world.step();
-    
-    // Update character physics with input
-    character.applyInput(inputManager, camera, deltaTime);
-    character.update(deltaTime);
-    
-    // Update third-person camera
-    thirdPersonCamera.update(deltaTime);
-    
-    // Reset input flags
-    if (inputManager.jumpWasPressed) {
-      inputManager.jumpWasPressed = false;
-      inputManager.resetMouseDelta();
-    }
-    
-    // Update character spotlight to follow character
-    if (characterLight && character) {
-      const charPosition = character.mesh.position.clone();
-      characterLight.target.position.copy(charPosition);
-      characterLight.spotlight.position.set(
-        charPosition.x, 
-        charPosition.y + 10, 
-        charPosition.z
-      );
-    }
-    
-    // Render the scene
-    renderer.render(scene, camera);
-    
-    // Continue the loop
-    requestAnimationFrame(gameLoop);
-  } catch (error) {
-    console.error("Error in game loop:", error);
-    requestAnimationFrame(gameLoop); // Keep the loop going even if there's an error
   }
-}
-
-// Function to add extra lighting specifically for the character
-function addCharacterSpotlight(scene, character) {
-  // Add a spotlight that follows the character
-  const spotlight = new THREE.SpotLight(0xFFFFFF, 2);
-  spotlight.position.set(0, 10, 0);
-  spotlight.angle = Math.PI / 6;
-  spotlight.penumbra = 0.5;
-  spotlight.decay = 1;
-  spotlight.distance = 30;
   
-  spotlight.castShadow = true;
-  spotlight.shadow.bias = -0.0001;
-  spotlight.shadow.mapSize.width = 1024;
-  spotlight.shadow.mapSize.height = 1024;
+  // Update character controller based on inputs
+  if (character) {
+    character.update({
+      forward: inputManager.keys.forward,
+      backward: inputManager.keys.backward,
+      left: inputManager.keys.left,
+      right: inputManager.keys.right,
+      jump: inputManager.keys.jump
+    }, deltaTime, camera);
+  }
   
-  scene.add(spotlight);
+  // Update camera position
+  if (thirdPersonCamera) {
+    thirdPersonCamera.update(deltaTime, inputManager.mouseDelta);
+    inputManager.resetMouseDelta();
+  }
   
-  // Target the spotlight at the character
-  const spotlightTarget = new THREE.Object3D();
-  scene.add(spotlightTarget);
-  spotlight.target = spotlightTarget;
-  
-  // Return the spotlight and target for updates
-  return { spotlight, target: spotlightTarget };
+  // Render the scene
+  if (scene && camera) {
+    renderer.render(scene, camera);
+  }
 }
 
 // Initialize the game when the page loads
