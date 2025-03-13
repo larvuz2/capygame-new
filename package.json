@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && echo 'Checking models directory...' && (if exist dist\\models\\character\\character.glb (echo 'Models copied successfully') else (echo 'WARNING: Models not found in dist folder!'))",
+    "build": "vite build && echo 'Checking models directory...' && (if [ -f dist/models/character/character.glb ]; then echo 'Models copied successfully'; else echo 'WARNING: Models not found in dist folder!'; fi)",
     "preview": "vite preview"
   },
   "keywords": [],
