@@ -1,13 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-// Import character model and animations directly as URL objects
-// This helps Vite track these assets during build
-import characterModelURL from '../assets/models/character/character.glb?url';
-import idleAnimationURL from '../assets/models/character/idle.glb?url';
-import walkAnimationURL from '../assets/models/character/walk.glb?url';
-import jumpAnimationURL from '../assets/models/character/jump.glb?url';
-
 export class CharacterModel {
   constructor(scene, parentMesh) {
     this.scene = scene;
@@ -26,8 +19,6 @@ export class CharacterModel {
     // Define the potential paths to try for model loading
     // The order is important - we'll try each until one works
     this.modelPaths = [
-      // Direct import URL managed by Vite (most reliable)
-      characterModelURL,
       // Relative paths (for development and some deployments)
       './models/character/character.glb',
       '../models/character/character.glb',
@@ -40,35 +31,24 @@ export class CharacterModel {
     // Animation paths organized by animation name
     this.animationPaths = {
       idle: [
-        idleAnimationURL,
         './models/character/idle.glb',
         '../models/character/idle.glb',
         '/models/character/idle.glb',
         `https://capygamevibes.netlify.app/models/character/idle.glb?v=${Date.now()}`
       ],
       walk: [
-        walkAnimationURL,
         './models/character/walk.glb',
         '../models/character/walk.glb',
         '/models/character/walk.glb',
         `https://capygamevibes.netlify.app/models/character/walk.glb?v=${Date.now()}`
       ],
       jump: [
-        jumpAnimationURL,
         './models/character/jump.glb',
         '../models/character/jump.glb',
         '/models/character/jump.glb',
         `https://capygamevibes.netlify.app/models/character/jump.glb?v=${Date.now()}`
       ]
     };
-    
-    // Add diagnostic info to console
-    console.log('Vite imported URLs:', {
-      character: characterModelURL,
-      idle: idleAnimationURL,
-      walk: walkAnimationURL,
-      jump: jumpAnimationURL
-    });
     
     // Verify if model files are accessible
     this.verifyModelAccess();
@@ -82,7 +62,7 @@ export class CharacterModel {
     // Check the first few URLs to see if they're accessible
     const urlsToCheck = [
       '/models/character/character.glb',
-      characterModelURL
+      './models/character/character.glb'
     ];
     
     urlsToCheck.forEach(url => {
