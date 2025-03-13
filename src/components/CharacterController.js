@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import * as RAPIER from '@dimforge/rapier3d-compat';
+import { CharacterModel } from './CharacterModel.js';
 
 export class CharacterController {
   constructor(world, scene, options = {}) {
@@ -23,6 +24,7 @@ export class CharacterController {
     this.acceleration = options.acceleration || 20.0;
     this.deceleration = options.deceleration || 10.0;
     this.currentSpeed = 0;
+    this.isMoving = false;
     
     // Debug flag
     this.debugMode = true;
@@ -35,6 +37,9 @@ export class CharacterController {
     
     // Add simple debug visuals
     this.createDebugVisuals();
+    
+    // Create 3D character model
+    this.characterModel = new CharacterModel(scene, this.mesh);
   }
   
   createMesh() {
@@ -43,7 +48,9 @@ export class CharacterController {
     const material = new THREE.MeshStandardMaterial({
       color: 0x4CAF50,
       roughness: 0.8,
-      metalness: 0.2
+      metalness: 0.2,
+      transparent: true,
+      opacity: 0.0 // Make the capsule invisible
     });
     
     this.mesh = new THREE.Mesh(geometry, material);
@@ -53,7 +60,11 @@ export class CharacterController {
     this.scene.add(this.mesh);
     
     const indicatorGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.4);
-    const indicatorMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const indicatorMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.0 // Make the direction indicator invisible too
+    });
     this.directionIndicator = new THREE.Mesh(indicatorGeometry, indicatorMaterial);
     this.directionIndicator.position.set(0, 0, this.radius + 0.1);
     this.mesh.add(this.directionIndicator);
@@ -253,38 +264,72 @@ export class CharacterController {
       if (inputs.left) this.moveDirection.sub(right);
       if (inputs.right) this.moveDirection.add(right);
       
-      // Update character rotation
-      const isMoving = this.moveDirection.lengthSq() > 0;
-      if (isMoving) {
+      // Normalize if moving diagonally
+      if (this.moveDirection.lengthSq() > 0) {
         this.moveDirection.normalize();
-        const targetRotation = new THREE.Quaternion();
-        targetRotation.setFromUnitVectors(new THREE.Vector3(0, 0, 1), this.moveDirection);
-        this.mesh.quaternion.slerp(targetRotation, deltaTime * this.rotationSpeed);
+        this.isMoving = true;
+      } else {
+        this.isMoving = false;
       }
       
-      // Update speed with acceleration/deceleration
-      const targetSpeed = isMoving ? this.maxSpeed : 0;
+      // Update character rotation
+      if (this.isMoving) {
+        const targetRotation = Math.atan2(this.moveDirection.x, this.moveDirection.z);
+        const currentRotation = this.mesh.rotation.y;
+        
+        // Smooth rotation
+        let newRotation = currentRotation;
+        const deltaRotation = targetRotation - currentRotation;
+        
+        // Handle -PI to PI transition
+        if (deltaRotation > Math.PI) {
+          newRotation += (deltaRotation - 2 * Math.PI) * this.rotationSpeed * deltaTime;
+        } else if (deltaRotation < -Math.PI) {
+          newRotation += (deltaRotation + 2 * Math.PI) * this.rotationSpeed * deltaTime;
+        } else {
+          newRotation += deltaRotation * this.rotationSpeed * deltaTime;
+        }
+        
+        this.mesh.rotation.y = newRotation;
+      }
       
-      this.currentSpeed = isMoving
-        ? Math.min(this.currentSpeed + this.acceleration * deltaTime, targetSpeed)
-        : Math.max(this.currentSpeed - this.deceleration * deltaTime, 0);
+      // Accelerate or decelerate smoothly
+      if (this.isMoving) {
+        // Accelerate up to max speed
+        this.currentSpeed += this.acceleration * deltaTime;
+        if (this.currentSpeed > this.maxSpeed) {
+          this.currentSpeed = this.maxSpeed;
+        }
+      } else {
+        // Decelerate to stop
+        this.currentSpeed -= this.deceleration * deltaTime;
+        if (this.currentSpeed < 0) {
+          this.currentSpeed = 0;
+        }
+      }
       
-      // Set horizontal velocity while preserving vertical velocity
-      // This simple approach keeps the jump physics separate from movement
-      const moveVelocity = new RAPIER.Vector3(
-        this.moveDirection.x * this.currentSpeed,
-        velocity.y, // Preserve the vertical velocity from jumping/gravity
-        this.moveDirection.z * this.currentSpeed
+      // Calculate final velocity vector
+      const moveVelocity = this.moveDirection.clone().multiplyScalar(this.currentSpeed);
+      
+      // Set the new velocity, preserving vertical velocity for jumps and falls
+      const linvel = new RAPIER.Vector3(
+        moveVelocity.x,
+        velocity.y, // Preserve vertical velocity
+        moveVelocity.z
       );
+      this.rigidBody.setLinvel(linvel, true);
       
-      this.rigidBody.setLinvel(moveVelocity, true);
+      // Sync the mesh position with the physics body
+      const translation = this.rigidBody.translation();
+      this.mesh.position.set(translation.x, translation.y, translation.z);
       
-      // Update mesh position from physics
-      const position = this.rigidBody.translation();
-      this.mesh.position.set(position.x, position.y, position.z);
+      // Update the character model animations
+      if (this.characterModel) {
+        this.characterModel.update(deltaTime, this.isMoving, this.isGrounded);
+      }
       
     } catch (error) {
-      console.error("Error in update:", error);
+      console.error("Error in character update:", error);
     }
   }
 }
